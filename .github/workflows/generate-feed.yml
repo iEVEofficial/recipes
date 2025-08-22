@@ -9,7 +9,7 @@ jobs:
   build-feed:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Memberi izin untuk commit file
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -20,6 +20,9 @@ jobs:
           python-version: '3.x'
 
       - name: Generate feed.xml
+        # ===== PERBAIKAN DI SINI =====
+        # Menambahkan 'shell: python' agar kode di bawah dieksekusi sebagai skrip Python
+        shell: python
         run: |
           import os
           import random
@@ -78,29 +81,24 @@ jobs:
               description_element.text = f'<![CDATA[{content_html}]]>'
           
           # --- 5. Tulis ke File feed.xml ---
-          # Konversi ke string dan format dengan rapi (pretty print)
           xml_str = tostring(rss, encoding='unicode')
           dom = minidom.parseString(xml_str)
           pretty_xml_str = dom.toprettyxml(indent="  ")
-
-          # ===== PERBAIKAN DI SINI =====
-          # Hapus semua baris kosong atau spasi dari awal file untuk mencegah error parsing
           final_xml_output = pretty_xml_str.lstrip()
           
           with open('feed.xml', 'w', encoding='utf-8') as f:
               f.write(final_xml_output)
           
-          print("✅ File feed.xml berhasil diperbaiki dan dibuat.")
+          print("✅ File feed.xml berhasil dibuat.")
 
       - name: Commit and Push feed.xml
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add feed.xml
-          # Commit hanya jika ada perubahan pada file feed.xml
           if git diff --staged --quiet; then
             echo "✅ Feed tidak berubah. Tidak ada yang di-commit."
           else
-            git commit -m "chore: Update and fix RSS feed format"
+            git commit -m "chore: Update RSS feed"
             git push
           fi
