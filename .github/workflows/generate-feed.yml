@@ -60,34 +60,22 @@ jobs:
           print(f"📝 Menghasilkan 50 item untuk feed...")
 
           for keyword in keywords[:50]:
-              # ===== BAGIAN INI DIKEMBALIKAN KE IDE AWAL =====
-
-              # 1. Judul: Menggunakan Spintext acak + Keyword
               random_prefix = random.choice(SPINTEXT)
               title = f"{random_prefix} {keyword.title()}"
-
-              # 2. Deskripsi: Mengambil secara acak dari file deskripsi.txt
               description_text = random.choice(descriptions)
-              
-              # =================================================
-
-              # Link: Format tetap sama
               url_keyword = keyword.replace(' ', '-').lower()
               link = f"https://{domain}/detail.html?q={url_keyword}"
-
-              # URL Gambar: Disesuaikan untuk <enclosure>
               encoded_keyword = urllib.parse.quote(keyword)
               image_url = f"https://tse1.mm.bing.net/th?q={encoded_keyword}&w=400&h=600&c=7&rs=1&p=0"
               
-              # Buat <item> dengan struktur yang benar
               item = SubElement(channel, 'item')
               SubElement(item, 'title').text = title
               SubElement(item, 'link').text = link
               SubElement(item, 'description').text = description_text
-              SubElement(item, 'guid', isPermaLink='true').text = link
               SubElement(item, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
               
-              # Tambahkan tag <enclosure> untuk gambar
+              # Baris <guid> telah dihapus dari sini
+              
               SubElement(item, 'enclosure', {
                   'url': image_url,
                   'type': 'image/jpeg'
@@ -102,7 +90,7 @@ jobs:
           with open('feed.xml', 'w', encoding='utf-8') as f:
               f.write(final_xml_output)
           
-          print("✅ File feed.xml berhasil dibuat dengan format yang benar.")
+          print("✅ File feed.xml (tanpa <guid>) berhasil dibuat.")
 
       - name: Commit and Push feed.xml
         run: |
@@ -112,6 +100,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "✅ Feed tidak berubah. Tidak ada yang di-commit."
           else
-            git commit -m "chore: Update RSS feed"
+            git commit -m "chore: Update RSS feed, remove guid"
             git push
           fi
