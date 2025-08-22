@@ -42,7 +42,7 @@ jobs:
               with open('keyword.txt', 'r') as f:
                   keywords = [line.strip() for line in f if line.strip()]
               with open('deskripsi.txt', 'r', encoding='utf-8') as f:
-                  descriptions = [desc.strip() for desc in f.read().split('---') if desc.strip()]
+                  descriptions_templates = [desc.strip() for desc in f.read().split('---') if desc.strip()]
           except FileNotFoundError as e:
               print(f"❌ Error: File {e.filename} tidak ditemukan.")
               exit(1)
@@ -62,7 +62,13 @@ jobs:
           for keyword in keywords[:50]:
               random_prefix = random.choice(SPINTEXT)
               title = f"{random_prefix} {keyword.title()}"
-              description_text = random.choice(descriptions)
+              
+              # ===== PERUBAHAN DI SINI =====
+              # 1. Pilih template deskripsi secara acak
+              description_template = random.choice(descriptions_templates)
+              # 2. Ganti placeholder %keyword% dengan keyword yang sebenarnya
+              description_text = description_template.replace('%keyword%', keyword.title())
+              
               url_keyword = keyword.replace(' ', '-').lower()
               link = f"https://{domain}/detail.html?q={url_keyword}"
               encoded_keyword = urllib.parse.quote(keyword)
@@ -73,8 +79,6 @@ jobs:
               SubElement(item, 'link').text = link
               SubElement(item, 'description').text = description_text
               SubElement(item, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
-              
-              # Baris <guid> telah dihapus dari sini
               
               SubElement(item, 'enclosure', {
                   'url': image_url,
@@ -90,7 +94,7 @@ jobs:
           with open('feed.xml', 'w', encoding='utf-8') as f:
               f.write(final_xml_output)
           
-          print("✅ File feed.xml (tanpa <guid>) berhasil dibuat.")
+          print("✅ File feed.xml berhasil dibuat dengan deskripsi dinamis.")
 
       - name: Commit and Push feed.xml
         run: |
@@ -100,6 +104,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "✅ Feed tidak berubah. Tidak ada yang di-commit."
           else
-            git commit -m "chore: Update RSS feed, remove guid"
+            git commit -m "chore: Update RSS feed with dynamic descriptions"
             git push
           fi
