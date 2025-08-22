@@ -1,0 +1,115 @@
+name: Generate Pinterest RSS Feed
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # Menjalankan sekali setiap hari jam 5 pagi (UTC)
+  workflow_dispatch: # Tombol untuk menjalankan manual
+
+jobs:
+  build-feed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Memberi izin untuk commit file
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Generate feed.xml
+        run: |
+          import os
+          import random
+          import html
+          from datetime import datetime, timezone
+          from xml.etree.ElementTree import Element, SubElement, tostring
+          from xml.dom import minidom
+          import urllib.parse
+
+          # --- 1. Konfigurasi Awal ---
+          SPINTEXT = ['Best', 'Easy', 'Quick', 'Delicious', 'Simple', 'Amazing', 'Irresistible', 'Ultimate', 'Flavorful', 'Ideas', 'Yummy']
+          GITHUB_USERNAME = "${{ github.repository_owner }}"
+          GITHUB_REPO_NAME = "${{ github.event.repository.name }}"
+          
+          # --- 2. Baca Semua File Konten ---
+          try:
+              with open('domain.txt', 'r') as f:
+                  domain = f.read().strip()
+              with open('keyword.txt', 'r') as f:
+                  keywords = [line.strip() for line in f if line.strip()]
+              with open('deskripsi.txt', 'r', encoding='utf-8') as f:
+                  descriptions = [desc.strip() for desc in f.read().split('---') if desc.strip()]
+          except FileNotFoundError as e:
+              print(f"❌ Error: File {e.filename} tidak ditemukan.")
+              exit(1)
+
+          # --- 3. Buat Struktur Dasar RSS Feed ---
+          rss = Element('rss', version='2.0', attrib={'xmlns:media': 'http://search.yahoo.com/mrss/'})
+          channel = SubElement(rss, 'channel')
+          SubElement(channel, 'title').text = f'Recipe Ideas from {domain}'
+          SubElement(channel, 'link').text = f"https://{GITHUB_USERNAME}.github.io/{GITHUB_REPO_NAME}"
+          SubElement(channel, 'description').text = 'A collection of delicious recipe ideas.'
+          SubElement(channel, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+
+          # --- 4. Loop untuk Membuat 50 Item Artikel ---
+          # Acak urutan keyword agar feed selalu terlihat fresh
+          random.shuffle(keywords)
+          
+          print(f"📝 Menghasilkan 50 item untuk feed dari {len(keywords)} kata kunci...")
+
+          for keyword in keywords[:50]: # Ambil 50 kata kunci pertama setelah diacak
+              random_prefix = random.choice(SPINTEXT)
+              
+              # Judul
+              title = f"{random_prefix} {keyword}".title()
+
+              # Link Permalink
+              url_keyword = keyword.replace(' ', '-').lower()
+              link = f"https://{domain}/detail.html?q={url_keyword}"
+
+              # Deskripsi
+              description_text = random.choice(descriptions)
+
+              # URL Gambar
+              encoded_keyword = urllib.parse.quote(keyword)
+              image_url = f"https://tse1.mm.bing.net/th?q={random.choice(SPINTEXT)}%20{encoded_keyword}&w=800&h=1200&c=7&rs=1&p=0"
+              
+              # Gabungkan gambar dan deskripsi untuk konten feed
+              content_html = f'<img src="{image_url}" alt="{html.escape(title)}" /><p>{html.escape(description_text)}</p>'
+              
+              # Buat <item> untuk setiap artikel
+              item = SubElement(channel, 'item')
+              SubElement(item, 'title').text = title
+              SubElement(item, 'link').text = link
+              SubElement(item, 'guid', isPermaLink='true').text = link
+              SubElement(item, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+              
+              description_element = SubElement(item, 'description')
+              description_element.text = f'<![CDATA[{content_html}]]>'
+          
+          # --- 5. Tulis ke File feed.xml ---
+          xml_str = tostring(rss, encoding='unicode')
+          # Pretty print the XML
+          dom = minidom.parseString(xml_str)
+          pretty_xml_str = dom.toprettyxml(indent="  ")
+
+          with open('feed.xml', 'w', encoding='utf-8') as f:
+              f.write(pretty_xml_str)
+          
+          print("✅ File feed.xml berhasil dibuat.")
+
+      - name: Commit and Push feed.xml
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add feed.xml
+          # Commit hanya jika ada perubahan pada file feed.xml
+          if git diff --staged --quiet; then
+            echo "✅ Feed tidak berubah. Tidak ada yang di-commit."
+          else
+            git commit -m "chore: Update RSS feed"
+            git push
+          fi
