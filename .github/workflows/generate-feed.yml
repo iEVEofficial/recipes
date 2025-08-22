@@ -20,8 +20,6 @@ jobs:
           python-version: '3.x'
 
       - name: Generate feed.xml
-        # ===== PERBAIKAN DI SINI =====
-        # Menambahkan 'shell: python' agar kode di bawah dieksekusi sebagai skrip Python
         shell: python
         run: |
           import os
@@ -50,36 +48,51 @@ jobs:
               exit(1)
 
           # --- 3. Buat Struktur Dasar RSS Feed ---
-          rss = Element('rss', version='2.0', attrib={'xmlns:media': 'http://search.yahoo.com/mrss/'})
+          rss = Element('rss', version='2.0')
           channel = SubElement(rss, 'channel')
           SubElement(channel, 'title').text = f'Recipe Ideas from {domain}'
           SubElement(channel, 'link').text = f"https://{GITHUB_USERNAME}.github.io/{GITHUB_REPO_NAME}"
           SubElement(channel, 'description').text = 'A collection of delicious recipe ideas.'
-          SubElement(channel, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+          SubElement(channel, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
 
           # --- 4. Loop untuk Membuat 50 Item Artikel ---
           random.shuffle(keywords)
-          print(f"📝 Menghasilkan 50 item untuk feed dari {len(keywords)} kata kunci...")
+          print(f"📝 Menghasilkan 50 item untuk feed...")
 
           for keyword in keywords[:50]:
+              # ===== BAGIAN INI DIKEMBALIKAN KE IDE AWAL =====
+
+              # 1. Judul: Menggunakan Spintext acak + Keyword
               random_prefix = random.choice(SPINTEXT)
-              title = f"{random_prefix} {keyword}".title()
+              title = f"{random_prefix} {keyword.title()}"
+
+              # 2. Deskripsi: Mengambil secara acak dari file deskripsi.txt
+              description_text = random.choice(descriptions)
+              
+              # =================================================
+
+              # Link: Format tetap sama
               url_keyword = keyword.replace(' ', '-').lower()
               link = f"https://{domain}/detail.html?q={url_keyword}"
-              description_text = random.choice(descriptions)
+
+              # URL Gambar: Disesuaikan untuk <enclosure>
               encoded_keyword = urllib.parse.quote(keyword)
-              image_url = f"https://tse1.mm.bing.net/th?q={random.choice(SPINTEXT)}%20{encoded_keyword}&w=800&h=1200&c=7&rs=1&p=0"
-              content_html = f'<img src="{image_url}" alt="{html.escape(title)}" /><p>{html.escape(description_text)}</p>'
+              image_url = f"https://tse1.mm.bing.net/th?q={encoded_keyword}&w=400&h=600&c=7&rs=1&p=0"
               
+              # Buat <item> dengan struktur yang benar
               item = SubElement(channel, 'item')
               SubElement(item, 'title').text = title
               SubElement(item, 'link').text = link
+              SubElement(item, 'description').text = description_text
               SubElement(item, 'guid', isPermaLink='true').text = link
-              SubElement(item, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
+              SubElement(item, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
               
-              description_element = SubElement(item, 'description')
-              description_element.text = f'<![CDATA[{content_html}]]>'
-          
+              # Tambahkan tag <enclosure> untuk gambar
+              SubElement(item, 'enclosure', {
+                  'url': image_url,
+                  'type': 'image/jpeg'
+              })
+
           # --- 5. Tulis ke File feed.xml ---
           xml_str = tostring(rss, encoding='unicode')
           dom = minidom.parseString(xml_str)
@@ -89,7 +102,7 @@ jobs:
           with open('feed.xml', 'w', encoding='utf-8') as f:
               f.write(final_xml_output)
           
-          print("✅ File feed.xml berhasil dibuat.")
+          print("✅ File feed.xml berhasil dibuat dengan format yang benar.")
 
       - name: Commit and Push feed.xml
         run: |
