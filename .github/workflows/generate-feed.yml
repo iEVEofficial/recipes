@@ -55,32 +55,19 @@ jobs:
           SubElement(channel, 'pubDate').text = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %z')
 
           # --- 4. Loop untuk Membuat 50 Item Artikel ---
-          # Acak urutan keyword agar feed selalu terlihat fresh
           random.shuffle(keywords)
-          
           print(f"📝 Menghasilkan 50 item untuk feed dari {len(keywords)} kata kunci...")
 
-          for keyword in keywords[:50]: # Ambil 50 kata kunci pertama setelah diacak
+          for keyword in keywords[:50]:
               random_prefix = random.choice(SPINTEXT)
-              
-              # Judul
               title = f"{random_prefix} {keyword}".title()
-
-              # Link Permalink
               url_keyword = keyword.replace(' ', '-').lower()
               link = f"https://{domain}/detail.html?q={url_keyword}"
-
-              # Deskripsi
               description_text = random.choice(descriptions)
-
-              # URL Gambar
               encoded_keyword = urllib.parse.quote(keyword)
               image_url = f"https://tse1.mm.bing.net/th?q={random.choice(SPINTEXT)}%20{encoded_keyword}&w=800&h=1200&c=7&rs=1&p=0"
-              
-              # Gabungkan gambar dan deskripsi untuk konten feed
               content_html = f'<img src="{image_url}" alt="{html.escape(title)}" /><p>{html.escape(description_text)}</p>'
               
-              # Buat <item> untuk setiap artikel
               item = SubElement(channel, 'item')
               SubElement(item, 'title').text = title
               SubElement(item, 'link').text = link
@@ -91,15 +78,19 @@ jobs:
               description_element.text = f'<![CDATA[{content_html}]]>'
           
           # --- 5. Tulis ke File feed.xml ---
+          # Konversi ke string dan format dengan rapi (pretty print)
           xml_str = tostring(rss, encoding='unicode')
-          # Pretty print the XML
           dom = minidom.parseString(xml_str)
           pretty_xml_str = dom.toprettyxml(indent="  ")
 
-          with open('feed.xml', 'w', encoding='utf-8') as f:
-              f.write(pretty_xml_str)
+          # ===== PERBAIKAN DI SINI =====
+          # Hapus semua baris kosong atau spasi dari awal file untuk mencegah error parsing
+          final_xml_output = pretty_xml_str.lstrip()
           
-          print("✅ File feed.xml berhasil dibuat.")
+          with open('feed.xml', 'w', encoding='utf-8') as f:
+              f.write(final_xml_output)
+          
+          print("✅ File feed.xml berhasil diperbaiki dan dibuat.")
 
       - name: Commit and Push feed.xml
         run: |
@@ -110,6 +101,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "✅ Feed tidak berubah. Tidak ada yang di-commit."
           else
-            git commit -m "chore: Update RSS feed"
+            git commit -m "chore: Update and fix RSS feed format"
             git push
           fi
